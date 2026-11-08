@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Labirin Matematika</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f4f1ea;--card:#fff;--ink:#222;--wall:#3b3a52;--floor:#efe9d8;--accent:#e07a1f;--ok:#2e9e5b;--bad:#d64545;--muted:#777}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#16161d;--card:#23232e;--ink:#eee;--wall:#0d0d14;--floor:#34344a;--muted:#999}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#16161d;--card:#23232e;--ink:#eee;--wall:#0d0d14;--floor:#34344a;--muted:#999}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;flex-direction:column;align-items:center;padding:12px;min-height:100vh}
+h1{font-size:1.3rem;margin:4px 0}
+.bar{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:6px 0}
+.chip{background:var(--card);padding:6px 12px;border-radius:20px;font-size:.9rem}
+canvas{max-width:100%;border-radius:10px;touch-action:none}
+.pad{display:grid;grid-template-columns:repeat(3,64px);grid-template-rows:repeat(2,56px);gap:6px;margin:12px 0}
+.pad button{font-size:1.5rem;border:0;border-radius:12px;background:var(--card);color:var(--ink)}
+.pad button:active{background:var(--accent)}
+.pad .u{grid-column:2}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:16px;z-index:5}
+.ov.on{display:flex}
+.box{background:var(--card);border-radius:16px;padding:20px;max-width:420px;width:100%;text-align:center}
+.box p{font-size:1.1rem;line-height:1.5;margin:8px 0 14px}
+input{width:100%;font-size:1.3rem;padding:10px;border-radius:10px;border:2px solid var(--muted);background:var(--bg);color:var(--ink);text-align:center}
+.btn{margin-top:10px;width:100%;padding:12px;font-size:1.05rem;border:0;border-radius:10px;background:var(--accent);color:#fff;font-weight:600}
+.btn.alt{background:var(--muted)}
+#msg{min-height:1.4em;margin-top:8px;font-weight:600}
+.shake{animation:sh .3s}
+@keyframes sh{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+</style>
+</head>
+<body>
+<h1>🧩 Labirin Matematika</h1>
+<div class="bar"><span class="chip" id="lv"></span><span class="chip" id="dr"></span><span class="chip" id="st"></span></div>
+<canvas id="c"></canvas>
+<div class="pad">
+<button class="u" data-d="0,-1">▲</button>
+<button data-d="-1,0" style="grid-row:2">◀</button>
+<button data-d="0,1" style="grid-row:2">▼</button>
+<button data-d="1,0" style="grid-row:2">▶</button>
+</div>
+<div class="bar"><button class="chip" id="nw" style="border:0;color:var(--ink)">🔄 Labirin baru</button></div>
+
+<div class="ov" id="qo"><div class="box" id="qb">
+<div>🔒 Pintu terkunci! Jawab untuk membuka:</div>
+<p id="q"></p>
+<input id="an" type="text" inputmode="decimal" autocomplete="off" placeholder="Jawabanmu">
+<div id="msg"></div>
+<button class="btn" id="go">Jawab</button>
+<button class="btn alt" id="cl">Kembali</button>
+</div></div>
+
+<div class="ov" id="wo"><div class="box">
+<h2>🎉 Kamu berhasil keluar!</h2>
+<p id="ws"></p>
+<button class="btn" id="nx">Level berikutnya</button>
+</div></div>
+
+<script>
+const R=n=>Math.floor(Math.random()*n),ri=(a,b)=>a+R(b-a+1),pick=a=>a[R(a.length)];
+const $=id=>document.getElementById(id);
+// ---------- Soal ----------
+const GEN=[
+()=>{const x=ri(2,12),a=ri(2,9),b=ri(1,20);return{q:`Tentukan nilai x jika ${a}x + ${b} = ${a*x+b}`,a:x}},
+()=>{const x=ri(2,10),a=ri(2,6),b=ri(1,9),c=ri(1,5);return{q:`Tentukan nilai x jika ${a}x − ${c} = ${a*x-c}`,a:x}},
+()=>{const p=pick([10,15,20,25,30,40,50,60]),k=ri(2,15);return{q:`Berapa ${p}% dari ${20*k}?`,a:p*k/5}},
+()=>{const t=pick([[3,4,5],[5,12,13],[8,15,17],[6,8,10],[9,12,15],[7,24,25]]);
+ return R(2)?{q:`Segitiga siku-siku punya sisi tegak ${t[0]} cm dan ${t[1]} cm. Berapa panjang sisi miringnya (cm)?`,a:t[2]}
+ :{q:`Segitiga siku-siku punya sisi miring ${t[2]} cm dan salah satu sisi tegak ${t[0]} cm. Berapa panjang sisi tegak lainnya (cm)?`,a:t[1]}},
+()=>{const p=ri(5,25),l=ri(3,20);return R(2)?{q:`Persegi panjang berukuran ${p} cm × ${l} cm. Berapa luasnya (cm²)?`,a:p*l}:{q:`Persegi panjang berukuran ${p} cm × ${l} cm. Berapa kelilingnya (cm)?`,a:2*(p+l)}},
+()=>{const a=ri(2,15),b=ri(2,9);return{q:`Hitung: √${a*a} + ${b}²`,a:a+b*b}},
+()=>{const n=[ri(60,100),ri(60,100),ri(60,100)];let s=n.reduce((x,y)=>x+y,0);const r=(4-s%4)%4;n.push(ri(60,100));s=n.reduce((x,y)=>x+y,0);n[3]+=(4-s%4)%4;
+ return{q:`Nilai ulangan Dina: ${n.join(", ")}. Berapa rata-ratanya?`,a:n.reduce((x,y)=>x+y,0)/4}},
+()=>{const a=ri(1,5),b=ri(a+1,7),k=ri(2,9);return{q:`Perbandingan kelereng Adi dan Budi adalah ${a} : ${b}. Jika jumlah kelereng ${(a+b)*k}, berapa kelereng Adi?`,a:a*k}},
+()=>{const k=ri(1,4);return R(2)?{q:`Hitung luas lingkaran berjari-jari ${7*k} cm (π = 22/7), dalam cm².`,a:22*7*k*k}:{q:`Hitung keliling lingkaran berjari-jari ${7*k} cm (π = 22/7), dalam cm.`,a:44*k}},
+()=>{const a=ri(2,9),b=ri(2,9),r=ri(1,20);return{q:`Hitung: (−${a}) × (−${b}) + ${r}`,a:a*b+r}},
+()=>{const g=ri(2,9),a=ri(2,7),b=ri(2,7);if(a===b)return GEN[10]();const f=(x,y)=>y?f(y,x%y):x;const d=f(a,b);
+ return{q:`Tentukan FPB dari ${g*a*d} dan ${g*b*d}`,a:f(g*a*d,g*b*d)}},
+()=>{const a=ri(30,80),b=ri(30,80);return{q:`Dua sudut segitiga besarnya ${a}° dan ${b}°. Berapa besar sudut ketiga (derajat)?`,a:180-a-b>0?180-a-b:GEN[11]().a}},
+()=>{const a=ri(2,6),x=ri(1,9),b=ri(2,5);return{q:`Jika ${a}(x + ${b}) = ${a*(x+b)}, berapa nilai x?`,a:x}},
+()=>{const a=ri(2,5),b=ri(2,4);return{q:`Hitung: ${a}^${b} (${a} pangkat ${b})`,a:Math.pow(a,b)}}
+];
+// perbaikan soal sudut agar konsisten
+GEN[11]=()=>{const a=ri(30,80),b=ri(30,80);return{q:`Dua sudut segitiga besarnya ${a}° dan ${b}°. Berapa besar sudut ketiga (derajat)?`,a:180-a-b}};
+const newQ=()=>pick(GEN)();
+
+// ---------- Labirin ----------
+let lv=1,N,W,g,pl,ex,doors,opened,steps,T,busy=false,curDoor=null,curQ=null;
+const cv=$('c'),cx=cv.getContext('2d');
+function gen(){
+ N=Math.min(6+lv,14);W=2*N+1;
+ g=Array.from({length:W},()=>Array(W).fill(1));
+ const sx=1+2*R(N),sy=1+2*R(N);g[sy][sx]=0;const st=[[sx,sy]];
+ while(st.length){const[x,y]=st[st.length-1];
+  const nb=[[2,0],[-2,0],[0,2],[0,-2]].map(([dx,dy])=>[x+dx,y+dy,dx/2,dy/2]).filter(([a,b])=>a>0&&b>0&&a<W-1&&b<W-1&&g[b][a]);
+  if(!nb.length){st.pop();continue}
+  const[a,b,hx,hy]=pick(nb);g[y+hy][x+hx]=0;g[b][a]=0;st.push([a,b]);}
+ // BFS dari awal, cari titik terjauh = pintu keluar
+ const par={},dist={},k=(x,y)=>x+","+y,q=[[sx,sy]];dist[k(sx,sy)]=0;let far=[sx,sy];
+ while(q.length){const[x,y]=q.shift();if(dist[k(x,y)]>dist[k(...far)])far=[x,y];
+  for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]]){const a=x+dx,b=y+dy;if(!g[b][a]&&dist[k(a,b)]===undefined){dist[k(a,b)]=dist[k(x,y)]+1;par[k(a,b)]=[x,y];q.push([a,b])}}}
+ const path=[];let c=far;while(c){path.unshift(c);c=par[k(...c)]}
+ pl={x:sx,y:sy};ex={x:far[0],y:far[1]};
+ const nd=Math.min(2+Math.ceil(lv/2),5);doors={};
+ for(let i=1;i<=nd;i++){const idx=Math.floor(path.length*i/(nd+1)),p=path[idx];doors[k(...p)]=true}
+ opened=0;steps=0;T=nd;hud();size();draw();
+}
+function size(){const t=Math.floor(Math.min(innerWidth-24,520)/W);cv.width=cv.height=t*W;cv.dataset.t=t}
+function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim()}
+function draw(){
+ const t=+cv.dataset.t;cx.clearRect(0,0,cv.width,cv.height);
+ for(let y=0;y<W;y++)for(let x=0;x<W;x++){cx.fillStyle=g[y][x]?css('--wall'):css('--floor');cx.fillRect(x*t,y*t,t,t)}
+ cx.font=`${t*.8}px serif`;cx.textAlign="center";cx.textBaseline="middle";
+ const e=(s,x,y)=>cx.fillText(s,x*t+t/2,y*t+t/2+1);
+ e("🏁",ex.x,ex.y);
+ for(const key in doors){const[x,y]=key.split(",").map(Number);cx.fillStyle="#b5651d";cx.fillRect(x*t+1,y*t+1,t-2,t-2);e("🔒",x,y)}
+ e("🧑",pl.x,pl.y);
+}
+function hud(){$('lv').textContent="Level "+lv;$('dr').textContent="🔓 Pintu: "+opened+"/"+T;$('st').textContent="👣 "+steps}
+function move(dx,dy){
+ if(busy)return;const x=pl.x+dx,y=pl.y+dy;if(g[y]?.[x]!==0)return;
+ const k=x+","+y;
+ if(doors[k]){curDoor=k;ask();return}
+ pl={x,y};steps++;hud();draw();
+ if(x===ex.x&&y===ex.y){busy=true;$('ws').textContent=`Level ${lv} selesai dalam ${steps} langkah. Semua pintu berhasil dibuka!`;$('wo').classList.add('on')}
+}
+// ---------- Soal pintu ----------
+function ask(){busy=true;curQ=newQ();$('q').textContent=curQ.q;$('an').value="";$('msg').textContent="";$('qo').classList.add('on');setTimeout(()=>$('an').focus(),50)}
+function answer(){
+ const v=parseFloat($('an').value.replace(",","."));
+ if(v===curQ.a){delete doors[curDoor];opened++;close();hud();draw();$('msg').textContent=""}
+ else{const b=$('qb');b.classList.remove('shake');void b.offsetWidth;b.classList.add('shake');
+  $('msg').style.color=css('--bad');$('msg').textContent="Belum tepat, coba soal baru!";
+  curQ=newQ();$('q').textContent=curQ.q;$('an').value="";}
+}
+function close(){busy=false;$('qo').classList.remove('on')}
+$('go').onclick=answer;$('cl').onclick=close;
+$('an').addEventListener('keydown',e=>{if(e.key==="Enter")answer()});
+$('nx').onclick=()=>{lv++;busy=false;$('wo').classList.remove('on');gen()};
+$('nw').onclick=()=>{busy=false;close();gen()};
+document.querySelectorAll('.pad button').forEach(b=>b.onclick=()=>move(...b.dataset.d.split(",").map(Number)));
+addEventListener('keydown',e=>{const m={ArrowUp:[0,-1],w:[0,-1],ArrowDown:[0,1],s:[0,1],ArrowLeft:[-1,0],a:[-1,0],ArrowRight:[1,0],d:[1,0]}[e.key];
+ if(m&&!busy){e.preventDefault();move(...m)}});
+addEventListener('resize',()=>{size();draw()});
+gen();
+</script>
+</body>
+</html>
